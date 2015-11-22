@@ -1,0 +1,97 @@
+---
+title: "Label ranking with package `labelrank`"
+author: "Artur Aiguzhinov"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  \usepackage[utf8]{inputenc}
+---
+
+## Introduction
+
+Label ranking is an increasingly popular topic in the machine learning literature. It studies the problem of learning a mapping from instances to rankings over a finite number of predefined labels. It is a variation of the conventional classification problem. In contrast to the classification setting, where the objective is to assign examples to a specific class, in label ranking we are interested in assigning a complete preference order of labels to every example.
+
+Unlike classification, where for each instance $x$ there is an associated class $y_i$, in label ranking problems there is a ranking of labels associated with every instance $x_i$ and the goal is to predict these rankings. This is also different from other ranking problems, such as in information retrieval or recommender systems. In these problems the target variable is a set of ratings or binary relevance labels for each item, and not a ranking.
+
+## Naive Bayes label ranking algorithm
+
+The algorithm is based on the  Bayes theorem that establishes the probability of $A$ given $B$ as:
+
+   $$P(A|B)=\frac{P(B|A)P(A)}{P(B)}$$
+ 
+After some substitutions, the naive Bayes classifier is given as:
+$$\max P\left(y\right)\prod_{i=1}^m P\left(x_{i}|y\right)$$
+where $m$ is the number of instances in the training set.
+
+
+As described earlier, the difference between classification and label ranking lies in the target variable, $y$. Therefore, to adapt NB for ranking we have to adapt the parts of the algorithm that depend on the target variable, namely:
+
+- prior probability, $P(y)$
+- conditional probability, $P(x|y)$
+
+The adaptation should take into account the differences in nature between label rankings and classes. We base our intuition on varying the similarity between rankings. Similarity-based label ranking algorithms have two important properties:
+
+- they assign non-zero probabilities even for rankings which have not been observed. This property is common to distribution-based methods;
+- they are based on the notion of similarity between rankings, which also underlies the evaluation measures that are commonly used. Better performance is naturally expected by aligning the algorithm with the evaluation measure.
+
+
+Similarity and probability are different concepts and, in order to adapt NB for label ranking based on the concept of similarity, it is necessary to relate them. A parallel has been established between probabilities and the general Euclidean distance measure. Maximizing the likelihood is equivalent to minimizing the distance (i.e., maximizing the similarity) in a Euclidean space.  Although not all assumptions required for that parallel hold when considering distance (or similarity) between rankings, given that the naive Bayes algorithm is known to be robust to violations of its assumptions, we propose a similarity-based adaptation of NB for label ranking.
+
+
+
+We say that the prior label ranking probability for the naive Bayes label ranking algorithm is given by:
+$$P_{LR}(y) = \frac{\sum_{i=1}^{n} \rho(y,y_i)}{n}$$
+where $\rho(y,y_i)$ is the measure of similarity between  rankings based on the Spearman correlation.
+
+The corresponding conditional label ranking probability is given as:
+$$P_{LR}(v_{i}|y)= \frac{\sum_{i: x_{i} = v_{i}}\rho(y, y_i)}{|\{i: x_{i} = v_{i}\}|}$$
+where $v$ is the value of variable $x_i$.
+
+
+The similarity-based adaptation of naive Bayes for label ranking will output the ranking with the higher $P_{LR}(y|x_i)$ value:
+
+$$\hat{y} = \max P_{LR}(y)\prod_{i=1}^m P_{LR}(x_{i}|y)$$
+
+
+## The nearest neighbor label ranking algorithm
+
+The nearest neighbor (`nn`) algorithm calculates a Euclidean distance  between attributes in training sample and a new set from test sample. Then, it finds `k` nearest neighbors: that is, which examples from the training data are close to the test data.  Then, the rankings are selected that correspond to these `k` instances. Finally, these `k` rankings are averaged by labels and the result is ranked to get ranking of labels.
+
+## Package `labelrank`
+
+### Naive Bayes label ranking algorithm example
+
+The presented package is the implementation of the naive Bayes algorithm. Consider an example of a label ranking model:
+
+```{r, echo=FALSE, results='asis'}
+load('../data/lr.nom.rda')
+load('../data/lr.num.rda')
+load('../data/y.rda')
+x <- lr.nom[1:5,]
+knitr::kable(cbind(x,y[1:5,]),col.names=c('$x_1$','$x_2$','A','B','C'),row.names=F,caption='Label ranking example')
+```
+
+The table has two independent variables $x_1$ and $x_2$ and three labels $A,B,C$ with different rankings in each instance. 
+
+An auxiliary function `model_nbr` calculates the prior and conditional probabilities and outputs them as `list` with two elements. Function `nb_rank` takes the output of the model and  predicts the most probable ranking for new instance of independent variables. For example, if have a new instance of `{d,a}`, the function predict the following ranking:
+
+```{r, echo=T,results='markup'}
+library(labelrank)
+x <- lr.nom[1:5,]
+ex.y <- y[1:5,]
+nb_rank(x,ex.y,x[5,])
+```
+
+### The nearest neighbor example
+
+Because of the distance-base nature, this algorithm applies only on data that has numeric attributes. The example bellow uses our synthetically created dataset `lr.num` that is part of this package for the purpose of demonstrations. 
+ 
+```{r, echo=T,results='markup'}
+
+ex.knn <- lr.num[1:5,]
+nn_rank(ex.knn,ex.y,ex.knn[5,])
+```
+
+
